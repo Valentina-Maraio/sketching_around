@@ -46,16 +46,23 @@ export default function Dashboard() {
   // Store the Tldraw editor
   const [editor, setEditor] = useState<Editor | null>(null);
   const [pointer, setPointer] = useState({ x: 0, y: 0 })
+  const [selectedPlaygroundItem, setSelectedPlaygroundItem] = useState<{
+    title: string
+    [key: string]: any
+  } | null>(null)
 
+  // For demonstration, define three avatars
+  const avatars: AvatarInfo[] = [
+    { name: "Alice", initials: "AL", color: "#e11d48" }, // red
+    { name: "Bob", initials: "BO", color: "#3b82f6" },   // blue
+    { name: "Cara", initials: "CA", color: "#10b981" }, // green
+  ]
+  // Current active user
+  const [currentUser, setCurrentUser] = useState<AvatarInfo>(avatars[0])
 
- // For demonstration, define three avatars
- const avatars: AvatarInfo[] = [
-  { name: "Alice", initials: "AL", color: "#e11d48" }, // red
-  { name: "Bob", initials: "BO", color: "#3b82f6" },   // blue
-  { name: "Cara", initials: "CA", color: "#10b981" }, // green
-]
-// Current active user
-const [currentUser, setCurrentUser] = useState<AvatarInfo>(avatars[0])
+  const handlePlaygroundItemClick = (item: any) => {
+    setSelectedPlaygroundItem(item)
+  }
 
   // Called when Tldraw mounts
   const handleEditorMount = (mountedEditor: Editor) => {
@@ -101,7 +108,7 @@ const [currentUser, setCurrentUser] = useState<AvatarInfo>(avatars[0])
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar onPlaygroundItemClick={handlePlaygroundItemClick} />
 
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
@@ -139,13 +146,31 @@ const [currentUser, setCurrentUser] = useState<AvatarInfo>(avatars[0])
         </header>
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <h2 className="text-sm mb-2">
-            Current user:{" "}
-            <span style={{ color: currentUser.color }}>
-              {currentUser.name} ({currentUser.initials})
-            </span>
-          </h2>
 
+          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+            <div className="aspect-video rounded-xl bg-muted/50">
+              {/* Show something based on which item is selected */}
+              {selectedPlaygroundItem ? (
+                <h3>{selectedPlaygroundItem.title} (Box #1)</h3>
+              ) : (
+                <h3>Project n.1</h3>
+              )}
+            </div>
+            <div className="aspect-video rounded-xl bg-muted/50">
+              {selectedPlaygroundItem ? (
+                <p>More about {selectedPlaygroundItem.title} (Box #2)</p>
+              ) : (
+                <h3>Project n.2</h3>
+              )}
+            </div>
+            <div className="aspect-video rounded-xl bg-muted/50">
+              {selectedPlaygroundItem ? (
+                <p>Even more data about {selectedPlaygroundItem.title} (Box #3)</p>
+              ) : (
+                <h3>Project n.3</h3>
+              )}
+            </div>
+          </div>
           <div
             className="relative min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min overflow-hidden"
             onPointerMove={(e) => {
