@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, MouseEvent } from "react"
 
 // Sidebar stuff
 import { AppSidebar } from "@/components/app-sidebar"
@@ -18,77 +18,80 @@ import "@tldraw/tldraw/tldraw.css"
 
 // Snapshot helpers from @tldraw/store
 
-// tRPC client
+
+// tRPC (same as before)
 import { trpc } from "@/utils/trpc"
 
+interface AvatarInfo {
+  name: string,
+  initials: string,
+  color: string,
+}
+
 export default function Dashboard() {
-  // Example: single doc "project1".  
-  // If you have multiple, pass the ID from your sidebar item, etc.
   const PROJECT_ID = "project1"
 
-  // Track which Playground item is selected (from the sidebar)
-  const [selectedPlaygroundItem, setSelectedPlaygroundItem] = useState<any>(null)
-
-  // Tldraw Editor instance (we get this from onMount)
-  const [editor, setEditor] = useState<Editor | null>(null)
-
-  // 1) tRPC query to load doc data from the server
   const { data, isLoading, isError, refetch } = trpc.document.getDoc.useQuery({
     id: PROJECT_ID,
   })
-
-  // 2) tRPC mutation to save doc data
-  //    The mutation status can be "idle" | "pending" | "success" | "error"
   const {
     mutate: saveDoc,
-    status,  // we'll check for 'pending' to see if it's "loading"
+    status,
     error: saveError,
   } = trpc.document.saveDoc.useMutation({
-    onSuccess: () => {
-      // Optionally refetch or show a success message
-      refetch()
-    },
+    onSuccess: () => refetch(),
   })
   const isSaving = status === "pending"
 
-  // Sidebar callback
-  const handlePlaygroundItemClick = (item: any) => {
-    setSelectedPlaygroundItem(item)
-    // If you want to fetch a doc for that item: refetch({ id: item.id })
-  }
+  // Store the Tldraw editor
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const [pointer, setPointer] = useState({ x: 0, y: 0 })
 
-  // 3) Tldraw onMount → the `Editor` instance in v3.x
+
+ // For demonstration, define three avatars
+ const avatars: AvatarInfo[] = [
+  { name: "Alice", initials: "AL", color: "#e11d48" }, // red
+  { name: "Bob", initials: "BO", color: "#3b82f6" },   // blue
+  { name: "Cara", initials: "CA", color: "#10b981" }, // green
+]
+// Current active user
+const [currentUser, setCurrentUser] = useState<AvatarInfo>(avatars[0])
+
+  // Called when Tldraw mounts
   const handleEditorMount = (mountedEditor: Editor) => {
     setEditor(mountedEditor)
   }
 
-// 4) When tRPC doc data arrives, apply it to the store
-useEffect(() => {
-  if (!editor || data === undefined) return;
+  // If we have doc data, load it
+  useEffect(() => {
+    if (!editor || data === undefined) return
+    if (data) {
+      editor.store.put(data) // merges saved shapes (including text)
+    }
+  }, [editor, data])
 
-  // If "data" is null, there's no existing doc → do nothing
-  // Otherwise, data is your saved snapshot
-  if (data) {
-    // Use editor.store.put to apply data
-    editor.store.put(data);
+  // Whenever currentUser changes, update the default shape style
+  useEffect(() => {
+    if (!editor) return
+    // This means new shapes (or text) will use this color by default
+  }, [editor, currentUser])
+
+  // A function to switch to a particular avatar
+  const handleSelectAvatar = (
+    e: MouseEvent<HTMLButtonElement>,
+    avatar: typeof avatars[number]
+  ) => {
+    e.preventDefault()
+    setCurrentUser(avatar)
   }
-}, [editor, data]);
 
-// 5) Save current shapes to the server
-const handleSave = () => {
-  if (!editor) return;
+  // Save the current shapes
+  const handleSave = () => {
+    if (!editor) return
+    const snapshot = editor.store.query.records("shape").get()
+    saveDoc({ id: PROJECT_ID, data: snapshot })
+  }
 
-  // Grab entire current state as JSON
-  const snapshot = editor.store.query.records("shape").get();
-
-  // Send to server
-  saveDoc({
-    id: PROJECT_ID,
-    data: snapshot,
-  });
-};
-
-  // Optional: handle loading/error states
   if (isLoading) {
     return <p>Loading doc from server...</p>
   }
@@ -98,69 +101,80 @@ const handleSave = () => {
 
   return (
     <SidebarProvider>
-      <AppSidebar onPlaygroundItemClick={handlePlaygroundItemClick} />
+      <AppSidebar />
+
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
-            <Avatar>
-              <AvatarImage src="https://github.com/shadcn.png" />
-              <AvatarFallback>CN</AvatarFallback>
-            </Avatar>
-            <Avatar>
-              <AvatarImage src="https://github.com/shadcn.png" />
-              <AvatarFallback>CN</AvatarFallback>
-            </Avatar>
-            <Avatar>
-              <AvatarImage src="https://github.com/shadcn.png" />
-              <AvatarFallback>CN</AvatarFallback>
-            </Avatar>
+
+            {/* Render 3 avatars as buttons to simulate different users */}
+            {avatars.map((av) => (
+              <button
+                key={av.name}
+                onClick={(e) => handleSelectAvatar(e, av)}
+                className="group relative"
+              >
+                <Avatar className="transition-opacity group-hover:opacity-80">
+                  <AvatarImage
+                    // your actual image if needed
+                    src="https://github.com/shadcn.png"
+                    alt={av.name}
+                  />
+                  <AvatarFallback>
+                    {av.initials.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Show a ring if this avatar is active */}
+                {currentUser.name === av.name && (
+                  <span
+                    className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full ring-2 ring-white"
+                    style={{ backgroundColor: av.color }}
+                  />
+                )}
+              </button>
+            ))}
           </div>
         </header>
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          {/* A few placeholders based on the selected side item */}
-          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-            <div className="aspect-video rounded-xl bg-muted/50">
-              {selectedPlaygroundItem ? (
-                <h3>{selectedPlaygroundItem.title} (Box #1)</h3>
-              ) : (
-                <h3>Project n.1</h3>
-              )}
-            </div>
-            <div className="aspect-video rounded-xl bg-muted/50">
-              {selectedPlaygroundItem ? (
-                <p>More about {selectedPlaygroundItem.title} (Box #2)</p>
-              ) : (
-                <h3>Project n.2</h3>
-              )}
-            </div>
-            <div className="aspect-video rounded-xl bg-muted/50">
-              {selectedPlaygroundItem ? (
-                <p>Even more data about {selectedPlaygroundItem.title} (Box #3)</p>
-              ) : (
-                <h3>Project n.3</h3>
-              )}
-            </div>
-          </div>
+          <h2 className="text-sm mb-2">
+            Current user:{" "}
+            <span style={{ color: currentUser.color }}>
+              {currentUser.name} ({currentUser.initials})
+            </span>
+          </h2>
 
-          {/* Tldraw Canvas */}
-          <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min overflow-hidden">
+          <div
+            className="relative min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min overflow-hidden"
+            onPointerMove={(e) => {
+              // get bounding rect offset if needed
+              setPointer({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY })
+            }}
+          >
             <Tldraw onMount={handleEditorMount} />
+            {/* colored cursor overlay */}
+            <div
+              className="pointer-events-none absolute flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-medium"
+              style={{
+                left: pointer.x,
+                top: pointer.y,
+                transform: "translate(50%, 50%)",
+                backgroundColor: currentUser.color,
+              }}
+            >
+              {currentUser.initials}
+            </div>
           </div>
 
-          {/* Debug: Show the loaded data */}
           <pre className="bg-gray-100 text-xs p-2 rounded max-h-60 overflow-auto">
             {JSON.stringify(data, null, 2)}
           </pre>
           {saveError && (
-            <p className="text-red-500">
-              Error saving doc: {saveError.message}
-            </p>
+            <p className="text-red-500">Error: {saveError.message}</p>
           )}
 
-          {/* Button to save */}
           <button
             onClick={handleSave}
             disabled={isSaving}
