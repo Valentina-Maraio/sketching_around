@@ -1,136 +1,155 @@
-"use client"
+"use client";
 
-import { useState, useEffect, MouseEvent } from "react"
+import { useState, useEffect, MouseEvent } from "react";
+import { io } from "socket.io-client"; // Import Socket.IO client
 
 // Sidebar stuff
-import { AppSidebar } from "@/components/app-sidebar"
-import { Separator } from "@/components/ui/separator"
+import { AppSidebar } from "@/components/app-sidebar";
+import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+} from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Tldraw + Editor for v3.x
-import { Tldraw, type Editor } from "@tldraw/tldraw"
-import "@tldraw/tldraw/tldraw.css"
+import { Tldraw, type Editor } from "@tldraw/tldraw";
+import "@tldraw/tldraw/tldraw.css";
 
-// tRPC (client)
-import { trpc } from "@/utils/trpc"
+// tRPC (client) for queries and mutations
+import { trpc } from "@/utils/trpc";
 
 interface AvatarInfo {
-  name: string
-  initials: string
-  color: string
+  name: string;
+  initials: string;
+  color: string;
 }
 
 export default function Dashboard() {
-  const PROJECT_ID = "project1"
+  const PROJECT_ID = "project1";
 
-  // tRPC hooks to get and save document data
+  // tRPC hooks for initial document load and saving document updates
   const { data, isLoading, isError, refetch } = trpc.document.getDoc.useQuery({
     id: PROJECT_ID,
-  })
+  });
   const { mutate: saveDoc, status, error: saveError } =
     trpc.document.saveDoc.useMutation({
       onSuccess: () => refetch(),
-    })
-  const isSaving = status === "pending"
+    });
+  const isSaving = status === "pending";
 
   // Store the Tldraw editor instance
-  const [editor, setEditor] = useState<Editor | null>(null)
-  const [pointer, setPointer] = useState({ x: 0, y: 0 })
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const [pointer, setPointer] = useState({ x: 0, y: 0 });
   const [selectedPlaygroundItem, setSelectedPlaygroundItem] = useState<{
-    title: string
-    [key: string]: any
-  } | null>(null)
+    title: string;
+    [key: string]: any;
+  } | null>(null);
 
-  // For demonstration, define three avatars
+  // Define three avatars for demonstration purposes
   const avatars: AvatarInfo[] = [
-    { name: "Alice", initials: "AL", color: "#e11d48" }, // red
-    { name: "Bob", initials: "BO", color: "#3b82f6" },   // blue
-    { name: "Cara", initials: "CA", color: "#10b981" },   // green
-  ]
-  // Current active user
-  const [currentUser, setCurrentUser] = useState<AvatarInfo>(avatars[0])
+    { name: "Alice", initials: "AL", color: "#e11d48" },
+    { name: "Bob", initials: "BO", color: "#3b82f6" },
+    { name: "Cara", initials: "CA", color: "#10b981" },
+  ];
+  const [currentUser, setCurrentUser] = useState<AvatarInfo>(avatars[0]);
 
   const handlePlaygroundItemClick = (item: any) => {
-    setSelectedPlaygroundItem(item)
-  }
+    setSelectedPlaygroundItem(item);
+  };
 
-  // Called when Tldraw mounts
+  // Called when Tldraw mounts; store the editor instance
   const handleEditorMount = (mountedEditor: Editor) => {
-    setEditor(mountedEditor)
-  }
+    setEditor(mountedEditor);
+  };
 
-  // When we receive document data, load it into the editor store
+  // When we receive document data via tRPC, load it into the editor store.
   useEffect(() => {
-    if (!editor || data === undefined) return
+    if (!editor || data === undefined) return;
     if (data) {
-      editor.store.put(data) // merges saved shapes (including text)
+      editor.store.put(data);
     }
-  }, [editor, data])
+  }, [editor, data]);
 
-  // Auto-save: listen to changes on the editor's store
-  // (Casting to any bypasses type issues with the HistoryEntry)
+  // -------------------------------
+  // Socket.IO: Real‑Time Updates
+  // -------------------------------
   useEffect(() => {
-    if (!editor) return
+    // Create the Socket.IO connection
+    // Adjust the URL if your Socket.IO server is hosted elsewhere.
+    const socket = io("ws://localhost:3001", { transports: ["websocket"] });
+
+    // Listen for "docUpdate" events from the server.
+    socket.on("docUpdate", (update) => {
+      console.log("Received docUpdate via Socket.IO:", update);
+      if (editor) {
+        // Merge the incoming update into the Tldraw store.
+        editor.store.put(update);
+      }
+    });
+
+    // Clean up the socket when the component unmounts or editor changes.
+    return () => {
+      socket.disconnect();
+    };
+  }, [editor]);
+
+  // Auto-save: listen to changes on the editor's store.
+  useEffect(() => {
+    if (!editor) return;
 
     const unsubscribe = (editor.store.listen as any)(
       (entry: any) => {
-        // Check for "put" or "update" actions that affect shapes.
         if (
           (entry.type === "put" || entry.type === "update") &&
           entry.records?.some((record: any) => record.typeName === "shape")
         ) {
-          const snapshot = editor.store.query.records("shape").get()
-          saveDoc({ id: PROJECT_ID, data: snapshot })
+          const snapshot = editor.store.query.records("shape").get();
+          saveDoc({ id: PROJECT_ID, data: snapshot });
         }
       },
       { scope: "document" }
-    )
+    );
 
     return () => {
-      unsubscribe()
-    }
-  }, [editor, saveDoc])
+      unsubscribe();
+    };
+  }, [editor, saveDoc]);
 
-  // Whenever currentUser changes, you might update new shapes’ default style here.
+  // Optionally, update new shapes' default style when currentUser changes.
   useEffect(() => {
-    if (!editor) return
+    if (!editor) return;
     // For example, update the default style of new shapes to use currentUser.color.
-  }, [editor, currentUser])
+  }, [editor, currentUser]);
 
-  // Switch to a particular avatar
+  // Switch avatars.
   const handleSelectAvatar = (
     e: MouseEvent<HTMLButtonElement>,
     avatar: typeof avatars[number]
   ) => {
-    e.preventDefault()
-    setCurrentUser(avatar)
-  }
+    e.preventDefault();
+    setCurrentUser(avatar);
+  };
 
-  // Manual save of the current shapes
+  // Manual save button.
   const handleSave = () => {
-    if (!editor) return
-    const snapshot = editor.store.query.records("shape").get()
-    saveDoc({ id: PROJECT_ID, data: snapshot })
-  }
+    if (!editor) return;
+    const snapshot = editor.store.query.records("shape").get();
+    saveDoc({ id: PROJECT_ID, data: snapshot });
+  };
 
-  // Button to programmatically modify a shape
+  // Modify a shape programmatically.
   const handleModifyShape = () => {
-    if (!editor) return
+    if (!editor) return;
 
-    // Retrieve the shapes using .get()
-    const shapes = editor.store.query.records("shape").get()
-    const shapeToModify = shapes[0]
+    const shapes = editor.store.query.records("shape").get();
+    const shapeToModify = shapes[0];
     if (!shapeToModify) {
-      alert("No shapes to modify!")
-      return
+      alert("No shapes to modify!");
+      return;
     }
 
-    // Modify the shape: move it 100px to the right and change its color to red.
     editor.store.put([
       {
         ...shapeToModify,
@@ -140,18 +159,17 @@ export default function Dashboard() {
           color: "red",
         },
       },
-    ])
+    ]);
 
-    // Immediately save the updated shapes
-    const snapshot = editor.store.query.records("shape").get()
-    saveDoc({ id: PROJECT_ID, data: snapshot })
-  }
+    const snapshot = editor.store.query.records("shape").get();
+    saveDoc({ id: PROJECT_ID, data: snapshot });
+  };
 
   if (isLoading) {
-    return <p>Loading doc from server...</p>
+    return <p>Loading doc from server...</p>;
   }
   if (isError) {
-    return <p>Error loading doc. Check logs!</p>
+    return <p>Error loading doc. Check logs!</p>;
   }
 
   return (
@@ -164,7 +182,7 @@ export default function Dashboard() {
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
 
-            {/* Render 3 avatars as buttons to simulate different users */}
+            {/* Render avatars as buttons */}
             {avatars.map((av) => (
               <button
                 key={av.name}
@@ -173,15 +191,11 @@ export default function Dashboard() {
               >
                 <Avatar className="transition-opacity group-hover:opacity-80">
                   <AvatarImage
-                    // Replace with your actual image if needed
                     src="https://github.com/shadcn.png"
                     alt={av.name}
                   />
-                  <AvatarFallback>
-                    {av.initials.toUpperCase()}
-                  </AvatarFallback>
+                  <AvatarFallback>{av.initials.toUpperCase()}</AvatarFallback>
                 </Avatar>
-                {/* Show a ring if this avatar is active */}
                 {currentUser.name === av.name && (
                   <span
                     className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full ring-2 ring-white"
@@ -211,7 +225,9 @@ export default function Dashboard() {
             </div>
             <div className="aspect-video rounded-xl bg-muted/50">
               {selectedPlaygroundItem ? (
-                <p>Even more data about {selectedPlaygroundItem.title} (Box #3)</p>
+                <p>
+                  Even more data about {selectedPlaygroundItem.title} (Box #3)
+                </p>
               ) : (
                 <h3>Project n.3</h3>
               )}
@@ -220,16 +236,13 @@ export default function Dashboard() {
           <div
             className="relative min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min overflow-hidden"
             onPointerMove={(e) => {
-              // Update the pointer's offset
               setPointer({
                 x: e.nativeEvent.offsetX,
                 y: e.nativeEvent.offsetY,
-              })
+              });
             }}
           >
-            {/* Tldraw editor */}
             <Tldraw onMount={handleEditorMount} />
-            {/* Colored cursor overlay */}
             <div
               className="pointer-events-none absolute flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-medium"
               style={{
@@ -241,7 +254,6 @@ export default function Dashboard() {
             >
               {currentUser.initials}
             </div>
-            {/* Figma-inspired Collaborators Panel */}
             <div className="absolute top-4 right-4 flex items-center space-x-[-8px]">
               {avatars.map((av) => (
                 <div key={av.name} className="w-10 h-10 border-2 border-white rounded-full">
@@ -279,5 +291,5 @@ export default function Dashboard() {
         </div>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }
