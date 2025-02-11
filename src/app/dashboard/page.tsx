@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, MouseEvent } from "react";
-import { io } from "socket.io-client"; // Import Socket.IO client
 
 // Sidebar stuff
 import { AppSidebar } from "@/components/app-sidebar";
@@ -18,7 +17,7 @@ import { Tldraw, type Editor } from "@tldraw/tldraw";
 import "@tldraw/tldraw/tldraw.css";
 
 // tRPC (client) for queries and mutations
-import { trpc } from "@/utils/trpc";
+import { trpc } from "../_trpc/client";
 
 interface AvatarInfo {
   name: string;
@@ -71,29 +70,6 @@ export default function Dashboard() {
       editor.store.put(data);
     }
   }, [editor, data]);
-
-  // -------------------------------
-  // Socket.IO: Real‑Time Updates
-  // -------------------------------
-  useEffect(() => {
-    // Create the Socket.IO connection
-    // Adjust the URL if your Socket.IO server is hosted elsewhere.
-    const socket = io("ws://localhost:3001", { transports: ["websocket"] });
-
-    // Listen for "docUpdate" events from the server.
-    socket.on("docUpdate", (update) => {
-      console.log("Received docUpdate via Socket.IO:", update);
-      if (editor) {
-        // Merge the incoming update into the Tldraw store.
-        editor.store.put(update);
-      }
-    });
-
-    // Clean up the socket when the component unmounts or editor changes.
-    return () => {
-      socket.disconnect();
-    };
-  }, [editor]);
 
   // Auto-save: listen to changes on the editor's store.
   useEffect(() => {
