@@ -1,29 +1,17 @@
-"use client"
+"use client";
 
+import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { trpc, trpcClient } from "@/utils/trpc";
 import "./globals.css";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { trpc } from "@/utils/trpc"
-import superjson from "superjson"
-import { httpBatchLink } from "@trpc/client"
-
-
-const queryClient = new QueryClient()
-
-const trpcClient = trpc.createClient({
-  links: [
-    httpBatchLink({
-      url: "/api/trpc",
-      transformer: superjson,
-    }),
-  ],
-});
+const queryClient = new QueryClient();
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
       <body>

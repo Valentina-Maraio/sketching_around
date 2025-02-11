@@ -1,9 +1,10 @@
-import Dashboard from "./dashboard/page";
+//import Dashboard from "./dashboard/page";
+import WhiteBoard from "./_components/WhiteBoard";
 
-export default function Home() {
+export default async function Home() {
   return (
     <>
-    <Dashboard/>
+    <WhiteBoard />
     </>
   );
 }
