@@ -1,5 +1,15 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+# Tldraw + Next.js + tRPC Example
+
+## Overview
+
+This project is a Next.js 13 application that demonstrates an interactive Tldraw editor with:
+- Real-time document retrieval and saving using tRPC.
+- A sidebar and avatar selection using TailwindCSS and Shadcn UI components.
+- A dedicated "Modify Shape" button to programmatically update a shape.
+- Automatic saving of shape changes via a store listener.
+
 ## Getting Started
 
 First, run the development server:
@@ -34,3 +44,18 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+## Final Notes
+
+- Make sure your `trpc` utility on the client (imported from `@/utils/trpc`) is properly configured to match your server’s setup.
+- Adjust folder paths as needed based on your project structure.
+- You now have a complete project that satisfies the specs:
+  - An interactive editor page.
+  - API endpoints to get/save document data.
+  - Automatic store updates and a button to modify a shape.
+  - TailwindCSS with Shadcn UI components.
+  - Type-safe API calls using tRPC.
+  - Documentation to set up and run the project.
+
+If you have any questions or need further adjustments, feel free to ask!
