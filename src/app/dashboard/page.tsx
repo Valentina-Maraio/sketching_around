@@ -16,35 +16,30 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tldraw, type Editor } from "@tldraw/tldraw"
 import "@tldraw/tldraw/tldraw.css"
 
-// Snapshot helpers from @tldraw/store
-
-
-// tRPC (same as before)
+// tRPC (client)
 import { trpc } from "@/utils/trpc"
 
 interface AvatarInfo {
-  name: string,
-  initials: string,
-  color: string,
+  name: string
+  initials: string
+  color: string
 }
 
 export default function Dashboard() {
   const PROJECT_ID = "project1"
 
+  // tRPC hooks to get and save document data
   const { data, isLoading, isError, refetch } = trpc.document.getDoc.useQuery({
     id: PROJECT_ID,
   })
-  const {
-    mutate: saveDoc,
-    status,
-    error: saveError,
-  } = trpc.document.saveDoc.useMutation({
-    onSuccess: () => refetch(),
-  })
+  const { mutate: saveDoc, status, error: saveError } =
+    trpc.document.saveDoc.useMutation({
+      onSuccess: () => refetch(),
+    })
   const isSaving = status === "pending"
 
-  // Store the Tldraw editor
-  const [editor, setEditor] = useState<Editor | null>(null);
+  // Store the Tldraw editor instance
+  const [editor, setEditor] = useState<Editor | null>(null)
   const [pointer, setPointer] = useState({ x: 0, y: 0 })
   const [selectedPlaygroundItem, setSelectedPlaygroundItem] = useState<{
     title: string
@@ -55,7 +50,7 @@ export default function Dashboard() {
   const avatars: AvatarInfo[] = [
     { name: "Alice", initials: "AL", color: "#e11d48" }, // red
     { name: "Bob", initials: "BO", color: "#3b82f6" },   // blue
-    { name: "Cara", initials: "CA", color: "#10b981" }, // green
+    { name: "Cara", initials: "CA", color: "#10b981" },   // green
   ]
   // Current active user
   const [currentUser, setCurrentUser] = useState<AvatarInfo>(avatars[0])
@@ -69,7 +64,7 @@ export default function Dashboard() {
     setEditor(mountedEditor)
   }
 
-  // If we have doc data, load it
+  // When we receive document data, load it into the editor store
   useEffect(() => {
     if (!editor || data === undefined) return
     if (data) {
@@ -77,13 +72,37 @@ export default function Dashboard() {
     }
   }, [editor, data])
 
-  // Whenever currentUser changes, update the default shape style
+  // Auto-save: listen to changes on the editor's store
+  // (Casting to any bypasses type issues with the HistoryEntry)
   useEffect(() => {
     if (!editor) return
-    // This means new shapes (or text) will use this color by default
+
+    const unsubscribe = (editor.store.listen as any)(
+      (entry: any) => {
+        // Check for "put" or "update" actions that affect shapes.
+        if (
+          (entry.type === "put" || entry.type === "update") &&
+          entry.records?.some((record: any) => record.typeName === "shape")
+        ) {
+          const snapshot = editor.store.query.records("shape").get()
+          saveDoc({ id: PROJECT_ID, data: snapshot })
+        }
+      },
+      { scope: "document" }
+    )
+
+    return () => {
+      unsubscribe()
+    }
+  }, [editor, saveDoc])
+
+  // Whenever currentUser changes, you might update new shapes’ default style here.
+  useEffect(() => {
+    if (!editor) return
+    // For example, update the default style of new shapes to use currentUser.color.
   }, [editor, currentUser])
 
-  // A function to switch to a particular avatar
+  // Switch to a particular avatar
   const handleSelectAvatar = (
     e: MouseEvent<HTMLButtonElement>,
     avatar: typeof avatars[number]
@@ -92,9 +111,38 @@ export default function Dashboard() {
     setCurrentUser(avatar)
   }
 
-  // Save the current shapes
+  // Manual save of the current shapes
   const handleSave = () => {
     if (!editor) return
+    const snapshot = editor.store.query.records("shape").get()
+    saveDoc({ id: PROJECT_ID, data: snapshot })
+  }
+
+  // Button to programmatically modify a shape
+  const handleModifyShape = () => {
+    if (!editor) return
+
+    // Retrieve the shapes using .get()
+    const shapes = editor.store.query.records("shape").get()
+    const shapeToModify = shapes[0]
+    if (!shapeToModify) {
+      alert("No shapes to modify!")
+      return
+    }
+
+    // Modify the shape: move it 100px to the right and change its color to red.
+    editor.store.put([
+      {
+        ...shapeToModify,
+        x: (shapeToModify.x ?? 0) + 100,
+        props: {
+          ...shapeToModify.props,
+          color: "red",
+        },
+      },
+    ])
+
+    // Immediately save the updated shapes
     const snapshot = editor.store.query.records("shape").get()
     saveDoc({ id: PROJECT_ID, data: snapshot })
   }
@@ -111,7 +159,7 @@ export default function Dashboard() {
       <AppSidebar onPlaygroundItemClick={handlePlaygroundItemClick} />
 
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
@@ -125,7 +173,7 @@ export default function Dashboard() {
               >
                 <Avatar className="transition-opacity group-hover:opacity-80">
                   <AvatarImage
-                    // your actual image if needed
+                    // Replace with your actual image if needed
                     src="https://github.com/shadcn.png"
                     alt={av.name}
                   />
@@ -146,10 +194,8 @@ export default function Dashboard() {
         </header>
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-
           <div className="grid auto-rows-min gap-4 md:grid-cols-3">
             <div className="aspect-video rounded-xl bg-muted/50">
-              {/* Show something based on which item is selected */}
               {selectedPlaygroundItem ? (
                 <h3>{selectedPlaygroundItem.title} (Box #1)</h3>
               ) : (
@@ -174,12 +220,16 @@ export default function Dashboard() {
           <div
             className="relative min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min overflow-hidden"
             onPointerMove={(e) => {
-              // get bounding rect offset if needed
-              setPointer({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY })
+              // Update the pointer's offset
+              setPointer({
+                x: e.nativeEvent.offsetX,
+                y: e.nativeEvent.offsetY,
+              })
             }}
           >
+            {/* Tldraw editor */}
             <Tldraw onMount={handleEditorMount} />
-            {/* colored cursor overlay */}
+            {/* Colored cursor overlay */}
             <div
               className="pointer-events-none absolute flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-medium"
               style={{
@@ -191,6 +241,17 @@ export default function Dashboard() {
             >
               {currentUser.initials}
             </div>
+            {/* Figma-inspired Collaborators Panel */}
+            <div className="absolute top-4 right-4 flex items-center space-x-[-8px]">
+              {avatars.map((av) => (
+                <div key={av.name} className="w-10 h-10 border-2 border-white rounded-full">
+                  <Avatar>
+                    <AvatarImage src="https://github.com/shadcn.png" alt={av.name} />
+                    <AvatarFallback>{av.initials}</AvatarFallback>
+                  </Avatar>
+                </div>
+              ))}
+            </div>
           </div>
 
           <pre className="bg-gray-100 text-xs p-2 rounded max-h-60 overflow-auto">
@@ -200,13 +261,21 @@ export default function Dashboard() {
             <p className="text-red-500">Error: {saveError.message}</p>
           )}
 
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="px-4 py-2 bg-blue-500 text-white rounded"
-          >
-            {isSaving ? "Saving..." : "Save tldraw Doc"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="px-4 py-2 bg-blue-500 text-white rounded"
+            >
+              {isSaving ? "Saving..." : "Save tldraw Doc"}
+            </button>
+            <button
+              onClick={handleModifyShape}
+              className="px-4 py-2 bg-green-500 text-white rounded"
+            >
+              Modify Shape
+            </button>
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>
