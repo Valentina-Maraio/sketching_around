@@ -17,10 +17,16 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
+import Link from "next/link"
+
+interface NavMainProps {
+  items: any[];
+  onPlaygroundItemClick?: (item: any) => void;
+}
 
 export function NavMain({
   items,
-  onPlaygroundItemClick, // <-- NEW
+  onPlaygroundItemClick,
 }: {
   items: {
     title: string
@@ -47,16 +53,11 @@ export function NavMain({
             className="group/collapsible"
           >
             <SidebarMenuItem>
-              {/* Top-level menu button (e.g. "Playground") */}
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton
                   tooltip={item.title}
                   onClick={(e) => {
-                    // If you specifically only want to handle "Playground" or certain items, you can do:
-                    // if (item.title === "Playground") {
-                    //   onPlaygroundItemClick?.(item)
-                    // }
-                    // Or simply call for all top-level items:
+                    e.preventDefault();
                     onPlaygroundItemClick?.(item)
                   }}
                 >
@@ -66,28 +67,20 @@ export function NavMain({
                 </SidebarMenuButton>
               </CollapsibleTrigger>
 
-              {/* Sub-items */}
               <CollapsibleContent>
                 <SidebarMenuSub>
                   {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
-                      {/* We can either use a link OR simply a button. 
-                          If you want to navigate, keep <a>. 
-                          If you want to purely show data, remove the href. */}
                       <SidebarMenuSubButton
                         asChild
-                        onClick={() => {
-                          // Call parent callback with the subItem data
+                        onClick={(e) => {
+                          e.preventDefault();
                           onPlaygroundItemClick?.(subItem)
                         }}
                       >
-                        {/* 
-                          If you want to prevent navigation, remove `href` 
-                          or do `onClick={(e) => e.preventDefault() ...}`
-                        */}
-                        <a href={subItem.url}>
+                        <Link href={subItem.url}>
                           <span>{subItem.title}</span>
-                        </a>
+                        </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   ))}

@@ -28,27 +28,12 @@ import {
 
 // Sample data
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   teams: [
     {
-      name: "Acme Inc",
+      name: "Sketching Around",
       logo: GalleryVerticalEnd,
       plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
+    }
   ],
   navMain: [
     {
@@ -58,12 +43,12 @@ const data = {
       isActive: true,
       items: [
         {
-          title: "History",
-          url: "#",
+          title: "Whiteboard",
+          url: "/playground/dashboard",
         },
         {
-          title: "Starred",
-          url: "#",
+          title: "History",
+          url: "/playground/history",
         },
         {
           title: "Settings",
@@ -165,16 +150,13 @@ export function AppSidebar({ onPlaygroundItemClick, ...props }: AppSidebarProps)
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher teams={data.teams}/>
       </SidebarHeader>
       <SidebarContent>
         {/* 1) Pass callback down to NavMain */}
         <NavMain items={data.navMain} onPlaygroundItemClick={onPlaygroundItemClick} />
         <NavProjects projects={data.projects} />
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={data.user} />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )
