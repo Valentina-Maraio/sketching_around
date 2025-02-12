@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, MouseEvent } from "react";
+import { useState, useCallback, MouseEvent, useRef } from "react";
 // Sidebar stuff
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -40,7 +40,8 @@ export default function Dashboard() {
     const [currentUser, setCurrentUser] = useState<AvatarInfo>(avatars[0]);
     const [pointer, setPointer] = useState({ x: 0, y: 0 });
     const [selectedPlaygroundItem, setSelectedPlaygroundItem] = useState<any>(null);
-    const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
+    const editorRef = useRef<Editor | null>(null);
+
 
     // TRPC: Use hooks instead of direct method calls.
     const { data: initialData } = trpc.store.getStore.useQuery();
@@ -55,43 +56,22 @@ export default function Dashboard() {
         };
     };
 
-    // Save the document to the API
-    const saveDocument = async (document: any) => {
-        try {
-            await updateStoreMutation.mutateAsync({ storeData: { document } });
-            console.log("Document saved successfully.");
-        } catch (error) {
-            console.error("Failed to save document:", error);
-        }
-    };
-
-    const debounceSave = useCallback(debounce(saveDocument, 300), [saveDocument]);
 
     // Called when Tldraw mounts; get the editor instance from onMount
     const handleEditorMount = useCallback((editor: Editor) => {
-        setEditorInstance(editor);
+        editorRef.current = editor;
 
-        // Load saved shapes from localStorage
-        const savedDocument = localStorage.getItem("shapes");
-        if (savedDocument) {
-            try {
-                const shapes = JSON.parse(savedDocument);
-                editor.store.put(shapes);
-            } catch (error) {
-                console.error("Failed to load shapes:", error);
-            }
-        }
-
-        // Automatically save changes when shapes update
         const unsubscribe = editor.store.listen(() => {
-            const shapesSnapshot = editor.store.allRecords(); 
-            localStorage.setItem("shapes", JSON.stringify(shapesSnapshot)); 
-            debounceSave(editor); 
+            const shapesSnapshot = editor.store.allRecords();
+
+            // Save directly to API instead of localStorage
+            updateStoreMutation.mutate({ storeData: shapesSnapshot });
         });
 
-        // Cleanup listener when component unmounts
         return () => unsubscribe();
-    }, [debounceSave, initialData]);
+    }, [updateStoreMutation]);
+
+
 
 
     // Switch avatars.
@@ -102,16 +82,15 @@ export default function Dashboard() {
 
     // Modify a shape programmatically.
     const handleModifyShape = () => {
-        if (!editorInstance) return;
+        if (!editorRef.current) return;
 
-        // Get the currently selected shapes.
-        const selectedShapeIds = editorInstance.getSelectedShapeIds();
+        const selectedShapeIds = editorRef.current.getSelectedShapeIds();
         if (selectedShapeIds.length === 0) {
             setShowAlert(true);
             return;
         }
 
-        // Modify the first selected shape (example).
+        // Modify the first selected shape (example)
         const updatedShape = {
             id: selectedShapeIds[0],
             type: "geo",
@@ -123,21 +102,28 @@ export default function Dashboard() {
             },
         };
 
-        editorInstance.updateShapes([updatedShape]);
+        editorRef.current.updateShapes([updatedShape]);
 
-        const updatedStoreSnapshot = editorInstance.store.query.records("shape");
+        // Extract only serializable shape data
+        const updatedStoreSnapshot = editorRef.current.store.query.records("shape").get();
+
+
 
         updateStoreMutation.mutate({ storeData: updatedStoreSnapshot });
     };
+
 
     return (
         <SidebarProvider>
             <AppSidebar onPlaygroundItemClick={setSelectedPlaygroundItem} />
             <SidebarInset>
-                <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear">
-                    <div className="flex items-center gap-2 px-4">
+                <header className="flex h-16 shrink-0 items-center transition-[width,height] ease-linear justify-between px-4"> {/* Key change here */}
+                    <div className="flex items-center gap-2"> {/* Left side: Trigger and Separator */}
                         <SidebarTrigger className="-ml-1" />
                         <Separator orientation="vertical" className="mr-2 h-4" />
+                    </div>
+                    <Button onClick={handleModifyShape}>Modify Shape</Button> {/* Middle: Button */}
+                    <div className="flex items-center gap-2"> {/* Right side: Avatars */}
                         {avatars.map((av) => (
                             <button
                                 key={av.name}
@@ -156,7 +142,6 @@ export default function Dashboard() {
                                 )}
                             </button>
                         ))}
-                        <Button onClick={handleModifyShape}>Modify Shape</Button>
                     </div>
                 </header>
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
