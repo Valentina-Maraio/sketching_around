@@ -144,47 +144,7 @@ export default function Dashboard() {
                         ))}
                     </div>
                 </header>
-                <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-                    <div
-                        className="relative min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min overflow-hidden"
-                        onPointerMove={(e) => {
-                            setPointer({
-                                x: e.nativeEvent.offsetX,
-                                y: e.nativeEvent.offsetY,
-                            });
-                        }}
-                    >
-                        <Tldraw onMount={handleEditorMount} />
-                        <div
-                            className={`fixed inset-0 z-50 flex items-center justify-center ${showAlert ? 'block' : 'hidden'
-                                }`}
-                        >
-                            <div className="absolute inset-0 bg-black/50" onClick={() => setShowAlert(false)}></div>
-                            <Alert className="relative z-10 w-[90%] max-w-md p-6 bg-white rounded-lg shadow-lg">
-                                <AlertTitle className="text-lg font-bold">Something's missing</AlertTitle>
-                                <AlertDescription className="mt-2 text-sm">
-                                    Select a shape to modify it.
-                                </AlertDescription>
-                                <div className="mt-4 flex justify-end">
-                                    <Button variant="outline" onClick={() => setShowAlert(false)}>
-                                        Close
-                                    </Button>
-                                </div>
-                            </Alert>
-                        </div>
-                        <div
-                            className="pointer-events-none absolute flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-medium"
-                            style={{
-                                left: pointer.x,
-                                top: pointer.y,
-                                transform: "translate(50%, 50%)",
-                                backgroundColor: currentUser.color,
-                            }}
-                        >
-                            {currentUser.initials}
-                        </div>
-                    </div>
-                </div>
+                {/* ... rest of your component */}
             </SidebarInset>
         </SidebarProvider>
     );
